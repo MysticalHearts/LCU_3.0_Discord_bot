@@ -1,0 +1,109 @@
+import discord
+from discord.ext import commands
+from discord.ui import View
+from discord import Interaction
+import asyncio
+from cogs.utils.checks import is_blacklisted, getColor
+import re
+from cogs.events import db
+
+class SettingsPanel(discord.ui.View):
+    def __init__(self, ctx, bot, pages, cur_page, contents):
+        super().__init__(timeout=None)
+        self.ctx = ctx
+        self.bot = bot
+        self.pages = pages
+        self.cur_page = cur_page
+        self.contents = contents
+
+    @discord.ui.button(label="<", style=discord.ButtonStyle.blurple)
+    async def back(self, ctx: Interaction, button: discord.ui.Button):
+       
+      try:
+        color = await getColor(ctx, "commands_color")
+      except:
+        color = "#36393e"
+      super().__init__(timeout=None)
+      if self.cur_page == 1:
+        self.cur_page = 5
+        e = discord.Embed(title=f"{list(self.contents.keys())[self.cur_page-1]}", description=f"\n{list(self.contents.values())[self.cur_page-1]}", color=color)
+        e.set_footer(text=f"Page {self.cur_page}/{self.pages}")
+        return await ctx.response.edit_message(embed=e)
+      else:
+        self.cur_page -= 1
+        e = discord.Embed(title=f"{list(self.contents.keys())[self.cur_page-1]}", description=f"\n{list(self.contents.values())[self.cur_page-1]}", color=color)
+        e.set_footer(text=f"Page {self.cur_page}/{self.pages}")
+        return await ctx.response.edit_message(embed=e)
+      
+    @discord.ui.button(label=">", style=discord.ButtonStyle.blurple)
+    async def next(self, ctx: Interaction, button: discord.ui.Button):
+       
+      try:
+        color = await getColor(ctx, "commands_color")
+      except:
+        color = "#36393e"
+
+      if self.cur_page >= self.pages:
+        self.cur_page = 1
+        e = discord.Embed(title=f"{list(self.contents.keys())[self.cur_page-1]}", description=f"\n{list(self.contents.values())[self.cur_page-1]}", color=color)
+        e.set_footer(text=f"Page {self.cur_page}/{self.pages}")
+        return await ctx.response.edit_message(embed=e)
+      else:
+        self.cur_page += 1
+        e = discord.Embed(title=f"{list(self.contents.keys())[self.cur_page-1]}", description=f"\n{list(self.contents.values())[self.cur_page-1]}", color=color)
+        e.set_footer(text=f"Page {self.cur_page}/{self.pages}")
+        return await ctx.response.edit_message(embed=e)
+
+class helpc(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.hybrid_command(description="Need help with commands? Run the help command.", with_app_command = True, extras={"category": "Other"})
+    @is_blacklisted()
+    async def help(self, ctx: commands.Context):
+      contents = {}
+      command_ids = {}
+
+      for command in await self.bot.tree.fetch_commands():
+          for child in command.options:
+              command_ids[f"{command.name} {child.name}"] = command.id
+          command_ids[f"{command}"] = command.id
+
+      for command in self.bot.walk_commands():
+          category = command.extras.get('category')
+          
+          if category and category not in ('Group', 'Staff'):
+              contents.setdefault(str(category), "")
+              cat = str(category)
+              value = contents.get(cat, "")
+              
+              try:
+                  command_id = command_ids.get(f"{command}")
+              except:
+                  pass
+              
+              value += f"</{command}:{command_id}> - {command.description}\n\n"
+              contents[cat] = value
+      
+      pages = int(len(contents))
+      cur_page = 1
+        
+      try:
+        color = await getColor(ctx, "commands_color")
+      except:
+        color = "#36393e"
+      e = discord.Embed(title=f"{list(contents.keys())[0]}", description=f"\n{list(contents.values())[0]}", color=color)
+      e.set_footer(text=f"Page {cur_page}/{pages}")
+      view = SettingsPanel(ctx, self.bot, pages, cur_page, contents)
+      msg = await ctx.send(embed=e, view = view)
+
+      try:
+        await self.bot.wait_for('interaction', timeout=800, check=lambda message: message.user == ctx.author and message.channel == ctx.channel)
+      except asyncio.TimeoutError:
+        view.next.disabled = True
+        view.back.disabled = True
+        return await msg.edit(view=view)
+
+
+async def setup(bot):
+  await bot.add_cog(helpc(bot))
