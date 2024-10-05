@@ -1,28 +1,124 @@
-import discord
+mport discord
 import os
+import sys
+import json
 from discord.ext import commands
-from cogs.utils.checks import load_env
-import sentry_sdk
+from discord import app_commands
+import asyncio
+import sqlite3
+from cogs.utils.checks import *
+import re
+import time
+import typing
 
-sentry_sdk.init(
-    dsn="https://bdd74ab2b48f403580613b913f2a4bec@o4505332868513792.ingest.sentry.io/4505332869955584",
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production.
-    traces_sample_rate=1.0,
-)
+intent = discord.Intents.default()
+intent.message_content = True
+intent.members = True
+bot = commands.Bot(command_prefix="t-", intents=intent)
+bot.remove_command('help')
 
 
-class Bot(commands.AutoShardedBot):
-    async def is_owner(self, user: discord.User):
-        bypassed_users = [837171770498744341, 1117952814044434442, 676895030094331915, 895279150275903500]
-        if user.id in bypassed_users:
-            return True
-        else:
-            return False
+def check_if_it_is_me(ctx):
+    return ctx.message.author.id == 676895030094331915 or ctx.message.author.id == 687423771346599946 or ctx.message.author.id == 688919016722661452
 
-    async def setup_hook(self) -> None:
-        for filename in os.listdir("./cogs"):
+async def load():
+  for filename in os.listdir('./cogs'):
+    if filename.endswith('.py'):
+      await bot.load_extension(f'cogs.{filename[:-3]}')
+
+async def main():
+  await load()
+  await bot.start("MTI4OTkyOTAzMjY0ODg4NDI4NA.GsXPDz.Kf76maU7j-tZu8NuozhIo3bNf_OSqGJZJ0RCBA")
+
+@bot.command(pass_context=True)
+@commands.check(check_if_it_is_me)
+async def get(ctx, extension):
+  await bot.load_extension(f"cogs.{extension}")
+  await ctx.send("Command(s) was loaded!")
+
+@bot.command(pass_context=True)
+@commands.check(check_if_it_is_me)
+async def delete(ctx, extension):
+  await bot.unload_extension(f"cogs.{extension}")
+  await ctx.send("Command(s) was deleted!")
+
+@bot.command(pass_context=True)
+@commands.check(check_if_it_is_me)
+async def reload(ctx, extension):
+  await bot.unload_extension(f"cogs.{extension}")
+  await bot.load_extension(f"cogs.{extension}")
+  await ctx.send("Command(s) was reloaded!")
+
+#This command is not to be touched by anyone or face infractions
+@bot.command()
+@commands.is_owner()
+async def sync(ctx, *, msg: typing.Optional[int] = None):
+  if msg is None:
+    await ctx.bot.tree.sync()
+  else:
+    await ctx.bot.tree.sync(guild=discord.Object(id = msg))
+  await ctx.send(f"commands are synced")
+
+@bot.command()
+@commands.check(check_if_it_is_me)
+async def testing(ctx: commands.Context, *, message: str):
+  con = sqlite3.connect("cogs/data/main_db.db")
+  cur = con.cursor()
+  res = cur.execute(f"SELECT * FROM promos")
+  result = res.fetchall()
+  print(result)
+
+@bot.command()
+@commands.check(check_if_it_is_me)
+async def devdm(ctx, member: discord.Member, *, message):
+  em = discord.Embed(title="Development Notification", description=message)
+  await member.send(embed=em)
+  await ctx.send("sent")
+
+asyncio.run(main())
+
+@bot.command(pass_context=True)
+@commands.check(check_if_it_is_me)
+async def delete(ctx, extension):
+  await bot.unload_extension(f"cogs.{extension}")
+  await ctx.send("Command(s) was deleted!")
+
+@bot.command(pass_context=True)
+@commands.check(check_if_it_is_me)
+async def reload(ctx, extension):
+  await bot.unload_extension(f"cogs.{extension}")
+  await bot.load_extension(f"cogs.{extension}")
+  await ctx.send("Command(s) was reloaded!")
+
+#This command is not to be touched by anyone or face infractions
+@bot.command()
+@commands.is_owner()
+async def sync(ctx, *, msg: typing.Optional[int] = None):
+  if msg is None:
+    await ctx.bot.tree.sync()
+  else:
+    await ctx.bot.tree.sync(guild=discord.Object(id = msg))
+  await ctx.send(f"commands are synced")
+
+@bot.command()
+@commands.check(check_if_it_is_me)
+async def testing(ctx: commands.Context, *, message: str):
+  con = sqlite3.connect("cogs/data/main_db.db")
+  cur = con.cursor()
+  res = cur.execute(f"SELECT * FROM promos")
+  result = res.fetchall()
+  print(result)
+
+@bot.command()
+@commands.check(check_if_it_is_me)
+async def devdm(ctx, member: discord.Member, *, message):
+  em = discord.Embed(title="Development Notification", description=message)
+  await member.send(embed=em)
+  await ctx.send("sent")
+
+asyncio.run(main())
+asyncio.set_event_loop(asyncio.new_event_loop())
+
             if filename.endswith(".py"):
                 await bot.load_extension(f"cogs.{filename[:-3]}")
         await bot.load_extension("cogs.utils.hot_reload")
